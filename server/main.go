@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/pat"
 	"github.com/jansemmelink/log"
@@ -16,12 +18,17 @@ import (
 const timeFormat = "2006-01-02T15:04:05+07:00"
 
 func main() {
-	log.DebugOn()
-
+	debugFlag := flag.Bool("debug", false, "DEBUG Mode")
+	addrFlag := flag.String("addr", "localhost:8080", "HTTP Server address")
+	flag.Parse()
+	if *debugFlag {
+		log.DebugOn()
+		log.Debugf("DEBUG Mode")
+	}
 	createBank()
 
-	addr := flag.String("addr", "localhost:8080", "HTTP Server address")
-	if err := http.ListenAndServe(*addr, router()); err != nil {
+	fmt.Fprintf(os.Stdout, "Serving %s\n", *addrFlag)
+	if err := http.ListenAndServe(*addrFlag, router()); err != nil {
 		panic(log.Wrapf(err, "HTTP Server failed"))
 	}
 }
