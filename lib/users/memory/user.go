@@ -9,12 +9,17 @@ import (
 //memoryUser implements IUser
 type memoryUser struct {
 	id       string
+	msisdn   string
 	username string
 	password string
 }
 
 func (u memoryUser) ID() string {
 	return u.id
+}
+
+func (u memoryUser) Msisdn() string {
+	return u.msisdn
 }
 
 func (u memoryUser) Name() string {
@@ -41,10 +46,11 @@ func (u *memoryUser) SetPassword(oldPassword, newPassword string) error {
 
 type factory struct{}
 
-func (f factory) New(username, password string) (users.IUser, error) {
+func (f factory) New(msisdn, name, password string) (users.IUser, error) {
 	u := &memoryUser{
 		id:       uuid.NewV1().String(),
-		username: username,
+		msisdn:   msisdn,
+		username: name,
 		password: password,
 	}
 	return u, nil

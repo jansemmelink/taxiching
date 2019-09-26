@@ -11,6 +11,7 @@ import (
 
 type IUser interface {
 	ID() string
+	Msisdn() string
 	Name() string
 	Auth(password string) bool
 	SetPassword(oldPassword, newPassword string) error
@@ -18,7 +19,7 @@ type IUser interface {
 }
 
 type IUserFactory interface {
-	New(username, password string) (IUser, error)
+	New(msisdn, name, password string) (IUser, error)
 }
 
 func Register(f IUserFactory) {
@@ -31,12 +32,13 @@ func Register(f IUserFactory) {
 }
 
 var (
-	namePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9@_\.-]*[a-zA-Z0-9]$`)
+	msisdnPattern = regexp.MustCompile(`^27[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$`)
+	namePattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9@_\.-]*[a-zA-Z0-9]$`)
 
-	usersMutex sync.Mutex
-	factory    IUserFactory
-	userByName = make(map[string]IUser)
-	userByID   = make(map[string]IUser)
+	usersMutex   sync.Mutex
+	factory      IUserFactory
+	userByID     = make(map[string]IUser)
+	userByMsisdn = make(map[string]IUser)
 )
 
 func ValidatePassword(s string) error {
@@ -60,16 +62,24 @@ func GetByID(id string) IUser {
 	return nil
 }
 
-func GetByName(n string) IUser {
+func GetByMsisdn(m string) IUser {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
-	if u, ok := userByName[n]; ok {
+	if u, ok := userByMsisdn[m]; ok {
 		return u
+	}
+	log.Debugf("User not found among %d users", len(userByMsisdn))
+	for m, u := range userByMsisdn {
+		log.Debugf("  %s: %v", m, u)
 	}
 	return nil
 }
 
-func New(username, password string) (IUser, error) {
+func New(msisdn, username, password string) (IUser, error) {
+	m := strings.Trim(msisdn, " ")
+	if !msisdnPattern.MatchString(m) {
+		return nil, log.Wrapf(nil, "invalid user.msisdn=\"%s\" must be 27+9digits", msisdn)
+	}
 	//name must be defined and valid
 	n := strings.Trim(username, " ")
 	if !namePattern.MatchString(n) {
@@ -82,13 +92,13 @@ func New(username, password string) (IUser, error) {
 
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
-	if _, ok := userByName[n]; ok {
-		return nil, log.Wrapf(nil, "user.name=\"%s\" already exists.", n)
+	if _, ok := userByMsisdn[m]; ok {
+		return nil, log.Wrapf(nil, "user.msisdn=\"%s\" already exists.", m)
 	}
 	if factory == nil {
 		return nil, log.Wrapf(nil, "no user factory registered")
 	}
-	newUser, err := factory.New(n, password)
+	newUser, err := factory.New(m, n, password)
 	if err != nil {
 		return nil, log.Wrapf(nil, "failed to create new user")
 	}
@@ -97,6 +107,17 @@ func New(username, password string) (IUser, error) {
 	}
 
 	userByID[newUser.ID()] = newUser
-	userByName[newUser.Name()] = newUser
+	userByMsisdn[newUser.Msisdn()] = newUser
+
+	{
+		log.Debugf("USER CREATED:{id:%s,msisdn:%s,name:%s}",
+			newUser.ID(),
+			newUser.Msisdn(),
+			newUser.Name())
+		log.Debugf("Now %d users:", len(userByID))
+		for _, u := range userByID {
+			log.Debugf("{id:%s,msisdn:%s,name:%s}", u.ID(), u.Msisdn(), u.Name())
+		}
+	}
 	return newUser, nil
 } //New()

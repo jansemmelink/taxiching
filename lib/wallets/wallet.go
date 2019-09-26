@@ -86,6 +86,15 @@ func New(userID string, walletName string, minBalance Amount) (IWallet, error) {
 	return newWallet, nil
 }
 
+func UserWallet(userID string, walletName string) IWallet {
+	if userWallets, ok := walletByUserID[userID]; ok {
+		if w, ok := userWallets[walletName]; ok {
+			return w
+		}
+	}
+	return nil
+}
+
 var (
 	depRefMutex    sync.Mutex
 	walletByDepRef = make(map[string]IWallet)

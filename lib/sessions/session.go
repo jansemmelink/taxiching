@@ -37,8 +37,9 @@ var (
 	sessionByID   = make(map[string]ISession)
 )
 
-func New(u string, p string) (ISession, error) {
-	user := users.GetByName(u)
+func New(userID string, p string) (ISession, error) {
+	log.Debugf("Creating session for %s %s", userID, p)
+	user := users.GetByID(userID)
 	if user == nil {
 		return nil, log.Wrapf(nil, "unknown user")
 	}
@@ -60,8 +61,37 @@ func New(u string, p string) (ISession, error) {
 		panic(log.Wrapf(nil, "session factory created session with unexpected user"))
 	}
 	sessionByID[newSession.ID()] = newSession
+
+	{
+		s := newSession
+		log.Debugf("SESSION START: {id:%s, start:%s, dur:%v, user:%s}", s.ID(), s.Start(), time.Now().Sub(s.Start()), s.User().ID())
+		logSessionList("started session.id=" + s.ID())
+	}
+
 	return newSession, nil
 } //New()
+
+func Get(id string) ISession {
+	s, ok := sessionByID[id]
+	if !ok {
+		logSessionList("session not found with id=" + id)
+		return nil
+	}
+
+	//automatically extend the session while being used
+	s.Extend()
+	return s
+} //Get()
+
+func End(id string) {
+	sessionsMutex.Lock()
+	defer sessionsMutex.Unlock()
+	if s, ok := sessionByID[id]; ok {
+		log.Debugf("SESSION ENDED: {id:%s, start:%s, dur:%v, user:%s}", s.ID(), s.Start(), time.Now().Sub(s.Start()), s.User().ID())
+		logSessionList("ended session.id=" + s.ID())
+		delete(sessionByID, id)
+	}
+}
 
 func IsValid(s ISession) bool {
 	if s != nil {
@@ -74,4 +104,12 @@ func IsValid(s ISession) bool {
 		}
 	}
 	return false
+}
+
+func logSessionList(title string) {
+	log.Debugf("===== %s =====", title)
+	for id, s := range sessionByID {
+		log.Debugf("  %s: %v", id, s)
+	}
+	log.Debugf("===== end =====")
 }
