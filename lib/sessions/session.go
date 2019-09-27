@@ -86,12 +86,18 @@ func New(userID string, p string) (ISession, error) {
 } //New()
 
 func Get(id string) ISession {
+	sessionsMutex.Lock()
+	defer sessionsMutex.Unlock()
 	s, ok := sessionByID[id]
 	if !ok {
 		logSessionList("session not found with id=" + id)
 		return nil
 	}
-
+	if s.Expire().Before(time.Now()) {
+		log.Debugf("Session.id=%s expired at %v", id, s.Expire())
+		delete(sessionByID, id)
+		return nil
+	}
 	//automatically extend the session while being used
 	s.Extend()
 	return s
