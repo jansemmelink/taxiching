@@ -62,6 +62,20 @@ func New(userID string, p string) (ISession, error) {
 	}
 	sessionByID[newSession.ID()] = newSession
 
+	//end and remove other sessions for the same user
+	for id, s := range sessionByID {
+		if s.User().ID() == user.ID() {
+			delete(sessionByID, id)
+			log.Debugf("  ENDING OTHER session.id=%s for user.id=%s started at %v", id, user.ID(), s.Start())
+			continue
+		}
+		if s.Expire().Before(time.Now()) {
+			delete(sessionByID, id)
+			log.Debugf("  ENDING EXPIRED session.id=%s for user.id=%s started at %v", id, user.ID(), s.Start())
+			continue
+		}
+	}
+
 	{
 		s := newSession
 		log.Debugf("SESSION START: {id:%s, start:%s, dur:%v, user:%s}", s.ID(), s.Start(), time.Now().Sub(s.Start()), s.User().ID())
