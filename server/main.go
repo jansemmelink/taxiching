@@ -17,13 +17,14 @@ const timeFormat = "2006-01-02T15:04:05+07:00"
 func main() {
 	debugFlag := flag.Bool("debug", false, "DEBUG Mode")
 	addrFlag := flag.String("addr", "localhost:8080", "HTTP Server address")
+	mongoURIFlag := flag.String("mongo", "mongodb://localhost:27017", "Mongo address")
 	flag.Parse()
 	if *debugFlag {
 		log.DebugOn()
 		log.Debugf("DEBUG Mode")
 	}
 
-	bank := ledger.New()
+	bank := ledger.New(*mongoURIFlag)
 
 	fmt.Fprintf(os.Stdout, "Serving %s\n", *addrFlag)
 	if err := http.ListenAndServe(*addrFlag, router(bank)); err != nil {
