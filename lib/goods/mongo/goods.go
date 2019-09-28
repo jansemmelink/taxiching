@@ -12,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 //e.g. Products("mongodb://localhost:27017", "taxiching")
@@ -30,10 +29,10 @@ func Products(mongoURI string, dbName string, users users.IUsers) (goods.IProduc
 		return nil, log.Wrapf(err, "Failed to connect to mongo %s", mongoURI)
 	}
 
-	err = client.Ping(ctx, readpref.Primary())
-	if err != nil {
-		return nil, log.Wrapf(err, "Failed to check mongo %s", mongoURI)
-	}
+	// err = client.Ping(ctx, readpref.Primary())
+	// if err != nil {
+	// 	return nil, log.Wrapf(err, "Failed to check mongo %s", mongoURI)
+	// }
 
 	collection := client.Database(dbName).Collection("products")
 	return &factory{
