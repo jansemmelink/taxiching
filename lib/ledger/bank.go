@@ -24,12 +24,12 @@ type Bank struct {
 	Sessions sessions.ISessions
 }
 
-func New() *Bank {
+func New(mongoURI string) *Bank {
 	var err error
 	b := &Bank{}
 
 	//users database
-	b.Users, err = mongousers.Users("mongodb://localhost:27017", "taxiching")
+	b.Users, err = mongousers.Users(mongoURI, "taxiching")
 	if err != nil {
 		panic(log.Wrapf(err, "failed to create users"))
 	}
@@ -42,7 +42,7 @@ func New() *Bank {
 		}
 	}
 
-	b.Wallets, err = mongowallets.Wallets("mongodb://localhost:27017", "taxiching", b.Users)
+	b.Wallets, err = mongowallets.Wallets(mongoURI, "taxiching", b.Users)
 	if err != nil {
 		panic(log.Wrapf(err, "failed to create wallets"))
 	}
@@ -52,7 +52,7 @@ func New() *Bank {
 		panic("Failed to create bank wallet: " + err.Error())
 	}
 
-	b.Goods, err = mongogoods.Products("mongodb://localhost:27017", "taxiching", b.Users)
+	b.Goods, err = mongogoods.Products(mongoURI, "taxiching", b.Users)
 
 	b.Sessions, err = memorysessions.New(b.Users)
 	if err != nil {
