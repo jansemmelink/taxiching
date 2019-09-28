@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jansemmelink/taxiching/lib/users"
-
 	"github.com/jansemmelink/log"
-	"github.com/jansemmelink/taxiching/lib/goods"
 	"github.com/jansemmelink/taxiching/lib/ledger"
-	"github.com/jansemmelink/taxiching/lib/sessions"
 	"github.com/jansemmelink/taxiching/lib/wallets"
 )
 
@@ -19,8 +15,8 @@ type sessionData struct {
 	UID     string            `json:"user-id,omitempty"`
 	Expiry  string            `json:"expiry,omitempty"`
 	Balance int               `json:"balance,omitempty"`
-	Recent  []transactionData `json:"recent,omitempty"`
-	Goods   []goodsData       `json:"goods,omitempty"`
+	Recent  []transactionData `json:"recent"`
+	Goods   []goodsData       `json:"goods"`
 }
 
 type transactionData struct {
@@ -42,15 +38,15 @@ type goodsData struct {
 }
 
 //r.Get("/session/{id}/ministatement", SessionMiniStatement)
-func SessionMiniStatement(res http.ResponseWriter, req *http.Request) {
+func SessionMiniStatement(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
 	}
-	w := wallets.UserWallet(s.User().ID(), "default")
+	w := bank.Wallets.UserWallet(s.User().ID(), "default")
 	if w == nil {
 		http.Error(res, "Failed to get user wallet", http.StatusInternalServerError)
 		return
@@ -83,24 +79,24 @@ func SessionMiniStatement(res http.ResponseWriter, req *http.Request) {
 }
 
 //r.Delete("/session/{id}/goods/{goodsid}", SessionGoodsDel)
-func SessionGoodsDel(res http.ResponseWriter, req *http.Request) {
+func SessionGoodsDel(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
 	}
 
 	goodsID := req.URL.Query().Get(":goodsid")
-	goods.Del(goodsID)
+	bank.Goods.DelID(goodsID)
 }
 
 //r.Get("/session/{id}/goods", SessionGoodsList)
-func SessionGoodsList(res http.ResponseWriter, req *http.Request) {
+func SessionGoodsList(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
@@ -114,7 +110,7 @@ func SessionGoodsList(res http.ResponseWriter, req *http.Request) {
 		Goods:  make([]goodsData, 0),
 	}
 
-	if ug, ok := goods.UserGoods(s.User().ID()); ok {
+	if ug, ok := bank.Goods.UserGoods(s.User().ID()); ok {
 		for _, g := range ug {
 			sd.Goods = append(sd.Goods, goodsData{
 				ID:   g.ID(),
@@ -126,13 +122,13 @@ func SessionGoodsList(res http.ResponseWriter, req *http.Request) {
 
 	j, _ := json.Marshal(sd)
 	res.Write(j)
-}
+} //SessionGoodsList()
 
 //r.Post("/session/{id}/goods", SessionGoodsAdd)
-func SessionGoodsAdd(res http.ResponseWriter, req *http.Request) {
+func SessionGoodsAdd(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
@@ -157,7 +153,7 @@ func SessionGoodsAdd(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	g, err := goods.New(s.User().ID(), gd.Name, gd.Cost)
+	g, err := bank.Goods.New(s.User().ID(), gd.Name, gd.Cost)
 	if err != nil {
 		http.Error(res, fmt.Sprintf("failed to create goods: %v", err), http.StatusBadRequest)
 		return
@@ -173,10 +169,10 @@ func SessionGoodsAdd(res http.ResponseWriter, req *http.Request) {
 }
 
 //r.Get("/session/{id}/keepalive", SessionKeepAlive)
-func SessionKeepAlive(res http.ResponseWriter, req *http.Request) {
+func SessionKeepAlive(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
@@ -197,21 +193,21 @@ func SessionKeepAlive(res http.ResponseWriter, req *http.Request) {
 }
 
 //r.Post("/session/{id}/pay/goods/{goodsid}", SessionPayGoods)
-func SessionPayGoods(res http.ResponseWriter, req *http.Request) {
+func SessionPayGoods(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
 	}
 	goodsID := req.URL.Query().Get(":goodsid")
-	g := goods.Get(goodsID)
+	g := bank.Goods.GetID(goodsID)
 	if g == nil {
 		http.Error(res, "Unknown goods id", http.StatusNotFound)
 		return
 	}
-	buyerWallet := wallets.UserWallet(s.User().ID(), "default")
+	buyerWallet := bank.Wallets.UserWallet(s.User().ID(), "default")
 	if buyerWallet == nil {
 		http.Error(res, "Failed to get user wallet", http.StatusInternalServerError)
 		return
@@ -224,7 +220,7 @@ func SessionPayGoods(res http.ResponseWriter, req *http.Request) {
 
 	//wallet of seller
 	seller := g.Owner()
-	sellerWallet := wallets.UserWallet(seller.ID(), "default")
+	sellerWallet := bank.Wallets.UserWallet(seller.ID(), "default")
 	if sellerWallet == nil {
 		http.Error(res, "Failed to get seller wallet", http.StatusInternalServerError)
 		return
@@ -235,7 +231,7 @@ func SessionPayGoods(res http.ResponseWriter, req *http.Request) {
 	}
 
 	ref := fmt.Sprintf("%s buy %s", s.User().Name(), g.Name())
-	t, err := ledger.Send(s, buyerWallet, sellerWallet, g.Cost(), ref)
+	t, err := bank.Send(s, buyerWallet, sellerWallet, g.Cost(), ref)
 	if err != nil {
 		http.Error(res, "Failed to transact: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -258,10 +254,10 @@ type depositRequest struct {
 }
 
 //r.Post("/session/{id}/deposit", SessionDeposit)
-func SessionDeposit(res http.ResponseWriter, req *http.Request) {
+func SessionDeposit(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	s := sessions.Get(sessionID)
+	s := bank.Sessions.GetID(sessionID)
 	if s == nil {
 		http.Error(res, "Unknown session", http.StatusUnauthorized)
 		return
@@ -285,12 +281,12 @@ func SessionDeposit(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	u := users.GetByMsisdn(r.Msisdn)
+	u := bank.Users.GetMsisdn(r.Msisdn)
 	if u == nil {
 		http.Error(res, "Unknown user msisdn="+r.Msisdn, http.StatusNotFound)
 		return
 	}
-	userWallet := wallets.UserWallet(u.ID(), "default")
+	userWallet := bank.Wallets.UserWallet(u.ID(), "default")
 	if userWallet == nil {
 		http.Error(res, "Failed to get user wallet", http.StatusInternalServerError)
 		return
@@ -298,7 +294,7 @@ func SessionDeposit(res http.ResponseWriter, req *http.Request) {
 
 	td := transactionData{}
 	ref := fmt.Sprintf("deposit into %s", r.Msisdn)
-	t, err := ledger.Send(s, bankWallet, userWallet, r.Amount, ref)
+	t, err := bank.Send(s, bank.BankWallet, userWallet, r.Amount, ref)
 	if err != nil {
 		http.Error(res, "Failed to transact: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -318,29 +314,9 @@ func SessionDeposit(res http.ResponseWriter, req *http.Request) {
 } //SessionDeposit()
 
 //r.Get("/session/{id}/logout", SessionLogout)
-func SessionLogout(res http.ResponseWriter, req *http.Request) {
+func SessionLogout(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	sessionID := req.URL.Query().Get(":id")
-	sessions.End(sessionID)
+	bank.Sessions.End(sessionID)
 	return
-}
-
-var (
-	adminUser  users.IUser
-	bankWallet wallets.IWallet
-)
-
-func createBank() {
-	var err error
-	adminUser, err = users.New("27824526299", "Jan", "1155")
-	if err != nil {
-		panic("Failed to create admin user: " + err.Error())
-	}
-
-	bankWallet, err = wallets.New(adminUser.ID(), "bank", -10000000)
-	if err != nil {
-		panic("Failed to create bank wallet: " + err.Error())
-	}
-
-	log.Debugf("Created bank account")
 }

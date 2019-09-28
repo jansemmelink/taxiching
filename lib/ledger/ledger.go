@@ -11,7 +11,7 @@ import (
 )
 
 //transact creates a new transaction
-func transact(dt, ct wallets.IWallet, txTime time.Time, amount wallets.Amount, desc, ref string) (ITransaction, error) {
+func (b Bank) transact(dt, ct wallets.IWallet, txTime time.Time, amount wallets.Amount, desc, ref string) (ITransaction, error) {
 	if txTime.After(time.Now()) {
 		return nil, log.Wrapf(nil, "future transaction time = %v", txTime)
 	}
@@ -100,8 +100,8 @@ func All() []ITransaction {
 }
 
 //Send money between wallets
-func Send(s sessions.ISession, from wallets.IWallet, to wallets.IWallet, amount wallets.Amount, reference string) (ITransaction, error) {
-	if !sessions.IsValid(s) {
+func (b Bank) Send(s sessions.ISession, from wallets.IWallet, to wallets.IWallet, amount wallets.Amount, reference string) (ITransaction, error) {
+	if !b.Sessions.IsValid(s) {
 		return nil, log.Wrapf(nil, "Invalid session")
 	}
 	if from == nil {
@@ -137,7 +137,7 @@ func Send(s sessions.ISession, from wallets.IWallet, to wallets.IWallet, amount 
 		return nil, log.Wrapf(nil, "insufficient funds (w:{id:%s,bal:%d,min-bal:%d} a:%d)", from.ID(), from.Balance(), from.MinBalance(), amount)
 	}
 
-	t, err := transact(
+	t, err := b.transact(
 		from,
 		to,
 		time.Now(),

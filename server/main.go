@@ -9,10 +9,7 @@ import (
 	"github.com/gorilla/pat"
 	"github.com/jansemmelink/log"
 
-	_ "github.com/jansemmelink/taxiching/lib/goods/memory"
-	_ "github.com/jansemmelink/taxiching/lib/sessions/memory"
-	_ "github.com/jansemmelink/taxiching/lib/users/memory"
-	_ "github.com/jansemmelink/taxiching/lib/wallets/memory"
+	"github.com/jansemmelink/taxiching/lib/ledger"
 )
 
 const timeFormat = "2006-01-02T15:04:05+07:00"
@@ -25,34 +22,35 @@ func main() {
 		log.DebugOn()
 		log.Debugf("DEBUG Mode")
 	}
-	createBank()
+
+	bank := ledger.New()
 
 	fmt.Fprintf(os.Stdout, "Serving %s\n", *addrFlag)
-	if err := http.ListenAndServe(*addrFlag, router()); err != nil {
+	if err := http.ListenAndServe(*addrFlag, router(bank)); err != nil {
 		panic(log.Wrapf(err, "HTTP Server failed"))
 	}
 }
 
-func router() http.Handler {
+func router(bank *ledger.Bank) http.Handler {
 	r := pat.New()
-	r.Get("/user/msisdn/{msisdn}", UserGetMsisdn)
-	r.Get("/user/{id}/login/{pin}", UserLogin)
-	r.Get("/user/{id}", UserGetID)
-	r.Post("/user", UserAdd)
+	r.Get("/user/msisdn/{msisdn}", func(res http.ResponseWriter, req *http.Request) { UserGetMsisdn(res, req, bank) })
+	r.Get("/user/{id}/login/{pin}", func(res http.ResponseWriter, req *http.Request) { UserLogin(res, req, bank) })
+	r.Get("/user/{id}", func(res http.ResponseWriter, req *http.Request) { UserGetID(res, req, bank) })
+	r.Post("/user", func(res http.ResponseWriter, req *http.Request) { UserAdd(res, req, bank) })
 
 	//session: goods
-	r.Post("/session/{id}/pay/goods/{goodsid}", SessionPayGoods)
-	r.Delete("/session/{id}/goods/{goodsid}", SessionGoodsDel)
-	r.Get("/session/{id}/goods", SessionGoodsList)
-	r.Post("/session/{id}/goods", SessionGoodsAdd)
+	r.Post("/session/{id}/pay/goods/{goodsid}", func(res http.ResponseWriter, req *http.Request) { SessionPayGoods(res, req, bank) })
+	r.Delete("/session/{id}/goods/{goodsid}", func(res http.ResponseWriter, req *http.Request) { SessionGoodsDel(res, req, bank) })
+	r.Get("/session/{id}/goods", func(res http.ResponseWriter, req *http.Request) { SessionGoodsList(res, req, bank) })
+	r.Post("/session/{id}/goods", func(res http.ResponseWriter, req *http.Request) { SessionGoodsAdd(res, req, bank) })
 
-	r.Get("/session/{id}/keepalive", SessionKeepAlive)
-	r.Get("/session/{id}/ministatement", SessionMiniStatement)
+	r.Get("/session/{id}/keepalive", func(res http.ResponseWriter, req *http.Request) { SessionKeepAlive(res, req, bank) })
+	r.Get("/session/{id}/ministatement", func(res http.ResponseWriter, req *http.Request) { SessionMiniStatement(res, req, bank) })
 
-	r.Get("/session/{id}/logout", SessionLogout)
+	r.Get("/session/{id}/logout", func(res http.ResponseWriter, req *http.Request) { SessionLogout(res, req, bank) })
 
 	//for demo:
 	//EFT:
-	r.Post("/session/{id}/deposit", SessionDeposit)
+	r.Post("/session/{id}/deposit", func(res http.ResponseWriter, req *http.Request) { SessionDeposit(res, req, bank) })
 	return r
 }

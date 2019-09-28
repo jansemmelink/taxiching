@@ -5,9 +5,7 @@ import (
 	"net/http"
 
 	"github.com/jansemmelink/log"
-	"github.com/jansemmelink/taxiching/lib/sessions"
-	"github.com/jansemmelink/taxiching/lib/users"
-	"github.com/jansemmelink/taxiching/lib/wallets"
+	"github.com/jansemmelink/taxiching/lib/ledger"
 )
 
 type userData struct {
@@ -17,7 +15,7 @@ type userData struct {
 	Pin    string `json:"pin,omitempty"`
 }
 
-func UserAdd(res http.ResponseWriter, req *http.Request) {
+func UserAdd(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	if req.URL.Path != "/user" || req.Method != http.MethodPost {
 		http.Error(res, "create user with POST /user", http.StatusBadRequest)
@@ -42,13 +40,13 @@ func UserAdd(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "invalid request: pin must be 4 digits", http.StatusBadRequest)
 		return
 	}
-	user, err := users.New(u.Msisdn, u.Name, u.Pin)
+	user, err := bank.Users.New(u.Msisdn, u.Name, u.Pin)
 	if err != nil {
 		http.Error(res, "failed to create user: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	userDefaultWallet, err := wallets.New(user.ID(), "default", 0)
+	userDefaultWallet, err := bank.Wallets.New(user, "default", 0)
 	if err != nil {
 		http.Error(res, "failed to create user wallet: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -61,14 +59,14 @@ func UserAdd(res http.ResponseWriter, req *http.Request) {
 	res.Write(j)
 } //UserAdd()
 
-func UserGetID(res http.ResponseWriter, req *http.Request) {
+func UserGetID(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	id := req.URL.Query().Get(":id")
 	if len(id) == 0 {
 		http.Error(res, "expecting /user/<id>", http.StatusBadRequest)
 		return
 	}
-	user := users.GetByID(id)
+	user := bank.Users.GetID(id)
 	if user == nil {
 		http.Error(res, "user "+id+" does not exist", http.StatusNotFound)
 		return
@@ -83,14 +81,14 @@ func UserGetID(res http.ResponseWriter, req *http.Request) {
 	res.Write(j)
 } //UserGetID()
 
-func UserGetMsisdn(res http.ResponseWriter, req *http.Request) {
+func UserGetMsisdn(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	msisdn := req.URL.Query().Get(":msisdn")
 	if len(msisdn) == 0 {
 		http.Error(res, "expecting /user/msisdn/<msisdn>", http.StatusBadRequest)
 		return
 	}
-	user := users.GetByMsisdn(msisdn)
+	user := bank.Users.GetMsisdn(msisdn)
 	if user == nil {
 		http.Error(res, "user "+msisdn+" does not exist", http.StatusNotFound)
 		return
@@ -105,7 +103,7 @@ func UserGetMsisdn(res http.ResponseWriter, req *http.Request) {
 	res.Write(j)
 } //UserGetMsisdn()
 
-func UserLogin(res http.ResponseWriter, req *http.Request) {
+func UserLogin(res http.ResponseWriter, req *http.Request, bank *ledger.Bank) {
 	log.Debugf("%s %s", req.Method, req.URL.Path)
 	userID := req.URL.Query().Get(":id")
 	pin := req.URL.Query().Get(":pin")
@@ -113,7 +111,7 @@ func UserLogin(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Login with /user/<id>/login/<pin>", http.StatusBadRequest)
 		return
 	}
-	session, err := sessions.New(userID, pin)
+	session, err := bank.Sessions.New(userID, pin)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusUnauthorized)
 		return
